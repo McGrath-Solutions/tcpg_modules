@@ -1,0 +1,3 @@
+name = MS Custom Modules
+description = Custom modules for TCPG.
+core = 7.x

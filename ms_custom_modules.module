@@ -1,0 +1,113 @@
+<?php
+
+/**
+ * Implements hook_commerce_checkout_complete
+ * Creates an associate vote on checkout
+ */
+function ms_custom_modules_commerce_checkout_complete($order) {
+
+  // get the order
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  
+  // loop through all line items
+  foreach ($order_wrapper->commerce_line_items as $delta => $line_item_wrapper) {
+    if($line_item_wrapper->commerce_product->title->value() == 'Associate Vote'){
+        if($line_item_wrapper->field_associate_name->value() || $line_item_wrapper->field_write_in->value()){
+
+            $values = array(
+               'type' => 'associate_votes',
+               'uid' => $order_wrapper->uid->value(),
+               'status' => 1,
+               'comment' => 0,
+               'promote' => 0,
+           );
+    
+      // create associate vote entity
+      $entity = entity_create('node', $values);
+
+      // set values for associate vote fields
+      $ewrapper = entity_metadata_wrapper('node', $entity);
+      // remember to update default value for fundraiser name in associate name line item in 
+      // admin/commerce/config/line-items/associate-name/fields
+      $ewrapper->field_fundraiser_name->set($line_item_wrapper->field_fundraiser_name->value());
+      $ewrapper->field_voting_year->set($line_item_wrapper->field_voting_year->value());
+      $ewrapper->field_add_vote->set(intval($line_item_wrapper->quantity->value()));
+      $ewrapper->field_assoc_name->set($line_item_wrapper->field_associate_name->value());
+      $ewrapper->field_write_in_name->set($line_item_wrapper->field_write_in->value());
+      $ewrapper->field_order_reference->set($order_wrapper->order_number->value());
+      
+      // save the associate vote
+      $ewrapper->save();
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_form_alter
+ * Modify form for adding an associate vote to the cart
+ */
+function ms_custom_modules_form_commerce_cart_add_to_cart_form_11_alter(&$form, &$form_state){
+    
+    $line_item = $form_state['line_item'];
+    $product = commerce_product_load($line_item->commerce_product[LANGUAGE_NONE][0]['product_id']);
+
+    if ($product->type == 'associate_of_the_year_vote') {
+        $form['submit']['#value'] = t('Vote!');
+        $form['submit']['#validate'][] = 'ms_custom_modules_commerce_add_to_cart_form_11_submit';
+    }
+}
+
+/**
+ * Implements hook_form_submit for adding associate vote to the cart.
+ * Validate Associate Name is selected and Write-in is not empty.
+ * Validate Associate Name is not selected and Write-in is not empty.
+ */
+function ms_custom_modules_commerce_add_to_cart_form_11_submit($form, &$form_state) {     
+   
+    $associate_name = $form_state['values']['line_item_fields']['field_associate_name']['und'][0]['target_id'];
+    $write_in = $form_state['values']['line_item_fields']['field_write_in']['und'][0]['value'];       
+   
+    if (!($associate_name)){
+        if(!($write_in)){
+            form_error($form, t('User must be selected or written-in.'));
+        }
+    }
+    else{
+        if($write_in){
+            form_error($form, t('Only one name may be selected or written-in.'));
+        }
+    }   
+}
+
+/**
+ * Implements hook_form_alter
+ * Modify form for adding an associate vote node
+ */
+function ms_custom_modules_form_associate_votes_node_form_alter(&$form, &$form_state){
+    
+    $form['actions']['submit']['#value'] = t('Save Vote');
+    $form['actions']['submit']['#validate'][] = 'ms_custom_modules_associate_votes_node_form_submit';
+}
+
+/**
+ * Implements hook_form_submit for Associate Votes node.
+ * Validate Assoc Name is selected and Write-in is not empty.
+ * Validate Assoc Name is not selected and Write-in is not empty.
+ */
+function ms_custom_modules_associate_votes_node_form_submit($form, &$form_state){
+    
+    $assoc_name = $form_state['values']['field_assoc_name']['und'][0]['target_id'];
+    $write_in_name = $form_state['values']['field_write_in_name']['und'][0]['value']; 
+        
+    if (!($assoc_name)){
+        if(!($write_in_name)){
+            form_error($form, t('User must be selected or written-in.'));
+        }
+    }
+    else{
+        if($write_in_name){
+            form_error($form, t('Only one name may be selected or written-in.'));
+        }
+    }   
+}
